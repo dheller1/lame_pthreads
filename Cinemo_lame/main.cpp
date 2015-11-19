@@ -2,6 +2,7 @@
 #include <list>
 #include <string>
 #include <vector>
+#include <ctime>
 #include "dirent.h"	/* this is used to get cross-platform directory listings without Boost. */
 
 #include "lame_interface.h"
@@ -62,7 +63,7 @@ list<string> parse_directory(const char *dirname)
 
 int main(int argc, char **argv)
 {
-	const int NUM_THREADS = 3;
+	const int NUM_THREADS = 4;
 	if (argc < 2) {
 		cerr << "Usage: " << argv[0] << " PATH" << endl;
 		cerr << "   PATH will be searched for .WAV files which will be converted to .MP3 format." << endl;
@@ -100,6 +101,9 @@ int main(int argc, char **argv)
 		threadArgs[i].iProcessedFiles = 0;
 	}
 
+	// timestamp
+	clock_t tBegin = clock();
+
 	// create worker threads
 	for (int i = 0; i < NUM_THREADS; i++) {
 		pthread_create(&threads[i], NULL, complete_encode_worker, (void*)&threadArgs[i]);
@@ -113,6 +117,9 @@ int main(int argc, char **argv)
 		}
 	}
 
+	// timestamp
+	clock_t tEnd = clock();
+
 	// write statistics
 	int iProcessedTotal = 0;
 	for (int i = 0; i < NUM_THREADS; i++) {
@@ -120,7 +127,8 @@ int main(int argc, char **argv)
 		iProcessedTotal += threadArgs[i].iProcessedFiles;
 	}
 
-	cout << "Converted " << iProcessedTotal << " out of " << numFiles << " files in total." << endl;
+	cout << "Converted " << iProcessedTotal << " out of " << numFiles << " files in total in " <<
+		double(tEnd-tBegin) / CLOCKS_PER_SEC << "s." << endl;
 
 	delete[] threads;
 	delete[] threadArgs;

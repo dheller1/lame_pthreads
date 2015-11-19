@@ -5,10 +5,6 @@ int encode_to_file(lame_global_flags *gfp, const FMT_DATA *hdr, const short *lef
 {
 	int numSamples = iDataSize / hdr->wBlockAlign;
 
-	// finish configuration in gfp
-	lame_set_num_samples(gfp, numSamples);
-	lame_set_num_channels(gfp, hdr->wChannels);
-
 	int mp3BufferSize = numSamples * 5 / 4 + 7200; // worst case estimate
 	unsigned char *mp3Buffer = new unsigned char[mp3BufferSize];
 
@@ -16,6 +12,10 @@ int encode_to_file(lame_global_flags *gfp, const FMT_DATA *hdr, const short *lef
 	int mp3size = lame_encode_buffer(gfp, (short*)leftPcm, (short*)rightPcm, numSamples, mp3Buffer, mp3BufferSize);
 	if (!(mp3size > 0)) {
 		delete[] mp3Buffer;
+		cerr << "No data was encoded by lame_encode_buffer. Return code: " << mp3size << endl;
+		cerr << "Diag: numSamples " << numSamples << ", mp3BufferSize " << mp3BufferSize << endl;
+		cerr << "      numChannels " << lame_get_num_channels(gfp) << ", bytesPerSample " << hdr->wBlockAlign << endl;
+		cerr << "      right Pcm addr " << (int)rightPcm << endl;
 		return EXIT_FAILURE;
 	}
 
@@ -229,6 +229,7 @@ int encode_chunks_to_file_multithreaded(lame_global_flags *gfp, const WAV_HDR *h
 
 void *complete_encode_worker(void* arg)
 {
+	int ret;
 	ENC_WRK_ARGS *args = (ENC_WRK_ARGS*)arg; // parse argument struct
 
 	while (true) {
@@ -267,13 +268,6 @@ void *complete_encode_worker(void* arg)
 		lame_set_quality(gfp, 3); // increase quality level
 		lame_set_bWriteVbrTag(gfp, 0);
 
-		// check params
-		int ret = lame_init_params(gfp);
-		if (ret != 0) {
-			cerr << "Invalid encoding parameters! Skipping file." << endl;
-			continue;
-		}
-
 		// parse wave file
 #ifdef __VERBOSE_
 		printf("Parsing %s ...\n", sMyFile.c_str());
@@ -285,10 +279,19 @@ void *complete_encode_worker(void* arg)
 			continue; // see if there's more to do
 		}
 
+		lame_set_num_channels(gfp, hdr->wChannels);
+		lame_set_num_samples(gfp, iDataSize / hdr->wBlockAlign);
+		// check params
+		ret = lame_init_params(gfp);
+		if (ret != 0) {
+			cerr << "Invalid encoding parameters! Skipping file." << endl;
+			continue;
+		}
+
 		// encode to mp3
 		ret = encode_to_file(gfp, hdr, leftPcm, rightPcm, iDataSize, sMyFileOut.c_str());
 		if (ret != EXIT_SUCCESS) {
-			cerr << "Unable to encode mp3." << endl;
+			cerr << "Unable to encode mp3: " << sMyFileOut.c_str() << endl;
 			continue;
 		}
 
@@ -296,6 +299,9 @@ void *complete_encode_worker(void* arg)
 		++args->iProcessedFiles;
 
 		lame_close(gfp);
+		if (leftPcm != NULL) delete[] leftPcm;
+		if (rightPcm != NULL) delete[] rightPcm;
+		if (hdr != NULL) delete[] hdr;
 	}
 
 	pthread_exit((void*)0);

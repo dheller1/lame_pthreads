@@ -107,6 +107,7 @@ int OBSOLETE_check_wave_header(const WAV_HDR *hdr)
 		return EXIT_FAILURE;
 	}
 
+
 #ifdef __VERBOSE_
 	cout << "Length of file-8:  " << hdr->fileLen << endl; // file length
 	cout << "PCM header length: " << hdr->pcmHeaderLength << endl;
@@ -130,6 +131,9 @@ void get_pcm_channels_from_wave(ifstream &file, const FMT_DATA* hdr, short* &lef
 	int idx;
 	int numSamples = iDataSize / hdr->wBlockAlign;
 
+	leftPcm = NULL;
+	rightPcm = NULL;
+
 	// allocate PCM arrays
 	leftPcm = new short[iDataSize / hdr->wChannels / sizeof(short)];
 	if (hdr->wChannels > 1)
@@ -137,12 +141,18 @@ void get_pcm_channels_from_wave(ifstream &file, const FMT_DATA* hdr, short* &lef
 
 	// capture each sample
 	file.seekg(iDataOffset);// set file pointer to beginning of data array
-	for (idx = 0; idx < numSamples; idx++)
-	{
-		file.read((char*)&leftPcm[idx], hdr->wBlockAlign / hdr->wChannels);
-		if (hdr->wChannels>1)
-			file.read((char*)&rightPcm[idx], hdr->wBlockAlign / hdr->wChannels);
+
+	if (hdr->wChannels == 1) {
+		file.read((char*)leftPcm, hdr->wBlockAlign * numSamples);
+	} else {
+		for (idx = 0; idx < numSamples; idx++) {
+			file.read((char*)&leftPcm[idx], hdr->wBlockAlign / hdr->wChannels);
+			if (hdr->wChannels>1)
+				file.read((char*)&rightPcm[idx], hdr->wBlockAlign / hdr->wChannels);
+		}
 	}
+
+	assert(rightPcm == NULL || hdr->wChannels != 1);
 
 #ifdef __VERBOSE_
 	cout << "File parsed successfully." << endl;
