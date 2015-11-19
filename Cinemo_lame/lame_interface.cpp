@@ -101,7 +101,7 @@ int encode_chunks_to_file(lame_global_flags *gfp, const WAV_HDR *hdr, const shor
 		int lastSample = firstSample + samplesPerChunk - 1;
 		if (lastSample >= numSamples) lastSample = numSamples - 1;
 
-		int ret = encode_chunk_to_buffer(firstSample, lastSample, gfp, leftPcm, rightPcm, outBuffers[i],
+		encode_chunk_to_buffer(firstSample, lastSample, gfp, leftPcm, rightPcm, outBuffers[i],
 			chunkSize, writtenInChunk[i]);
 #ifdef __VERBOSE_
 		cout << "Chunk " << i << " (samples " << firstSample << "-" << lastSample << "): Wrote "
@@ -180,7 +180,7 @@ int encode_chunks_to_file_multithreaded(lame_global_flags *gfp, const WAV_HDR *h
 
 	// spawn threads
 	for (int i = 0; i < numChunks; i++) {
-		int ret = pthread_create(&threads[i], NULL, encode_chunk_to_buffer_worker, (void*)&threadArgs[i]);
+		pthread_create(&threads[i], NULL, encode_chunk_to_buffer_worker, (void*)&threadArgs[i]);
 	}
 
 	// let them do work and synchronize

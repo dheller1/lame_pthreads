@@ -45,7 +45,6 @@ void get_pcm_channels_from_wave(ifstream &file, const WAV_HDR* hdr, short* &left
 	assert(sizeof(WAV_HDR) == 44);
 	int idx;
 
-	int curChannel = 0; // index into pcmChannels array
 	int numSamples = hdr->dataSize / hdr->bytesPerSample;
 
 	// allocate PCM arrays
@@ -69,14 +68,16 @@ void get_pcm_channels_from_wave(ifstream &file, const WAV_HDR* hdr, short* &left
 
 int read_wave(const char *filename, WAV_HDR* &hdr, short* &leftPcm, short* &rightPcm)
 {
+#ifdef __VERBOSE_
 	streamoff size;
+#endif
 
 	ifstream inFile(filename, ios::in | ios::binary);
 	if (inFile.is_open()) {
 		// determine size and allocate buffer
 		inFile.seekg(0, ios::end);
-		size = inFile.tellg();
 #ifdef __VERBOSE_
+		size = inFile.tellg();
 		cout << "Opened file. Allocating " << size << " bytes." << endl;
 #endif
 
