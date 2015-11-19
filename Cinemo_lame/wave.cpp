@@ -41,7 +41,7 @@ int check_wave_header(const WAV_HDR *hdr)
 void get_pcm_channels_from_wave(ifstream &file, const WAV_HDR* hdr, short* &leftPcm, short* &rightPcm)
 {
 	assert(sizeof(WAV_HDR) == 44);
-	unsigned int idx;
+	int idx;
 
 	int curChannel = 0; // index into pcmChannels array
 	int numSamples = hdr->dataSize / hdr->bytesPerSample;
@@ -65,7 +65,7 @@ void get_pcm_channels_from_wave(ifstream &file, const WAV_HDR* hdr, short* &left
 
 int read_wave(const char *filename, WAV_HDR* &hdr, short* &leftPcm, short* &rightPcm)
 {
-	size_t size;
+	streamoff size;
 
 	ifstream inFile(filename, ios::in | ios::binary);
 	if (inFile.is_open()) {

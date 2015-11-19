@@ -14,13 +14,13 @@ bool string_ends_with(const string &fullString, const string &subString)
 	else {
 		// lowercase conversion
 		string fullString_l = fullString;
-		for (int i = 0; i < fullString_l.length(); i++) {
+		for (unsigned int i = 0; i < fullString_l.length(); i++) {
 			if ('A' <= fullString_l[i] && fullString_l[i] <= 'Z')
 				fullString_l[i] = fullString_l[i] - ('Z' - 'z');
 		}
 
 		string subString_l = subString;
-		for (int i = 0; i < subString_l.length(); i++) {
+		for (unsigned int i = 0; i < subString_l.length(); i++) {
 			if ('A' <= subString_l[i] && subString_l[i] <= 'Z')
 				subString_l[i] = subString_l[i] - ('Z' - 'z');
 		}
@@ -50,7 +50,6 @@ list<string> parse_directory(const char *dirname)
 
 int main(void)
 {
-	int ret;
 	const int NUM_THREADS = 2;
 	cout << "LAME version: " << get_lame_version() << endl;
 

@@ -14,7 +14,7 @@ int encode_to_file(lame_global_flags *gfp, const WAV_HDR *hdr, const short *left
 
 	// call to lame_encode_buffer
 	int mp3size = lame_encode_buffer(gfp, (short*)leftPcm, (short*)rightPcm, numSamples, mp3Buffer, mp3BufferSize);
-	if (!mp3size > 0) {
+	if (!(mp3size > 0)) {
 		delete[] mp3Buffer;
 		return EXIT_FAILURE;
 	}
