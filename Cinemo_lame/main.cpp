@@ -168,39 +168,62 @@ int encode_chunk_to_buffer(int firstSample, int lastSample, lame_global_flags *g
 	return EXIT_SUCCESS;
 }
 
-int encode_chunks_to_file(lame_global_flags *gfp, const WAV_HDR *hdr, const short *leftPcm, const short*rightPcm,
-	unsigned char *outBuffer, int &bytesWritten, unsigned short numChunks=1)
+int encode_chunks_to_file(lame_global_flags *gfp, const WAV_HDR *hdr, const short *leftPcm, const short *rightPcm,
+	int &bytesWritten, const char *filename, unsigned short numChunks=1)
 {
 	int numSamples = hdr->dataSize / hdr->bytesPerSample;
-	
 	int samplesPerChunk = numSamples / numChunks + 1;
 	int chunkSize = samplesPerChunk * 5 / 4 + 7200; // worst case estimate in bytes
+
+	bytesWritten = 0;
 
 	// allocate output buffers
 	unsigned char **outBuffers = new unsigned char*[numSamples];
 	int *writtenInChunk = new int[numSamples];
-	for (int i = 0; i < numSamples; i++) {
+	for (int i = 0; i < numChunks; i++) {
 		outBuffers[i] = new unsigned char[chunkSize];
 	}
 
 	// encode chunks
-	for (int i = 0; i < numSamples; i++) {
-		int firstSample = i * chunkSize;
-		int lastSample = firstSample + chunkSize - 1;
+	for (int i = 0; i < numChunks; i++) {
+		int firstSample = i * samplesPerChunk;
+		int lastSample = firstSample + samplesPerChunk - 1;
 		if (lastSample >= numSamples) lastSample = numSamples - 1;
 
 		int ret = encode_chunk_to_buffer(firstSample, lastSample, gfp, leftPcm, rightPcm, outBuffers[i],
 			chunkSize, writtenInChunk[i]);
-		cout << "Chunk " << i << ": Wrote " << writtenInChunk[i] << " bytes." << endl;
+		cout << "Chunk " << i << " (samples " << firstSample << "-" << lastSample << "): Wrote "
+			<< writtenInChunk[i] << " bytes." << endl;
 	}
 
+	// write chunk buffers to file
+	FILE *out = fopen(filename, "wb+");
+	for (int i = 0; i < numChunks; i++) {
+		fwrite((void*)outBuffers[i], sizeof(unsigned char), writtenInChunk[i], out);
+		bytesWritten += writtenInChunk[i];
+	}
+
+
 	// clear temporary buffers
-	for (int i = 0; i < numSamples; i++) {
+	for (int i = 0; i < numChunks; i++) {
 		delete[] outBuffers[i];
 	}
 	delete[] outBuffers;
 	delete[] writtenInChunk;
 
+	// flush buffers
+	unsigned char *flushBuffer = new unsigned char[32768]; // just provide enough buffer size, lower might be fine
+	int flushSize = lame_encode_flush(gfp, flushBuffer, 32768);
+	
+	fwrite((void*)flushBuffer, sizeof(unsigned char), flushSize, out);
+	bytesWritten += flushSize;
+	delete[] flushBuffer;
+
+	lame_mp3_tags_fid(gfp, out);
+
+	fclose(out);
+
+	cout << "Wrote " << bytesWritten << " bytes in total." << endl;
 	return EXIT_SUCCESS;
 }
 
@@ -232,48 +255,52 @@ int main(void)
 		return EXIT_FAILURE;
 	}
 
-	//// encode to mp3
-	//ret = encode_to_file(gfp, hdr, leftPcm, rightPcm, "test.mp3");
-	//if (ret != EXIT_SUCCESS) {
-	//	cerr << "Unable to encode to mp3." << endl;
-	//	return EXIT_FAILURE;
-	//}
+	// encode to mp3
+	/*ret = encode_to_file(gfp, hdr, leftPcm, rightPcm, "test.mp3");
+	if (ret != EXIT_SUCCESS) {
+		cerr << "Unable to encode to mp3." << endl;
+		return EXIT_FAILURE;
+	}*/
 
-	int numSamples = hdr->dataSize / hdr->bytesPerSample;
-	lame_set_num_channels(gfp, hdr->numChannels);
-	lame_set_num_samples(gfp, numSamples);
+	int written = 0;
+	ret = encode_chunks_to_file(gfp, hdr, leftPcm, rightPcm, written, "test.mp3", 8);
 
-	int bufferSize = numSamples * 5 / 4 + 7200; // worst case estimate
-	unsigned char *outBuffer = new unsigned char[bufferSize];
 
-	int bytesWritten = 0;
+	//int numSamples = hdr->dataSize / hdr->bytesPerSample;
+	//lame_set_num_channels(gfp, hdr->numChannels);
+	//lame_set_num_samples(gfp, numSamples);
 
-	// encode in chunks
-	int totalBytes = 0;
-	ret = encode_chunk_to_buffer(0, numSamples/2, gfp, leftPcm, rightPcm, outBuffer, bufferSize, bytesWritten);
-	cout << bytesWritten << endl;
-	totalBytes += bytesWritten;
+	//int bufferSize = numSamples * 5 / 4 + 7200; // worst case estimate
+	//unsigned char *outBuffer = new unsigned char[bufferSize];
 
-	ret = encode_chunk_to_buffer(numSamples / 2 + 1, numSamples - 1, gfp, leftPcm, rightPcm,
-		&outBuffer[totalBytes], bufferSize, bytesWritten);
-	cout << bytesWritten << endl;
-	totalBytes += bytesWritten;
+	//int bytesWritten = 0;
 
-	cout << "Total bytes: " << totalBytes << endl;
+	//// encode in chunks
+	//int totalBytes = 0;
+	//ret = encode_chunk_to_buffer(0, numSamples/2, gfp, leftPcm, rightPcm, outBuffer, bufferSize, bytesWritten);
+	//cout << bytesWritten << endl;
+	//totalBytes += bytesWritten;
 
-	// save to file
-	FILE *out = fopen("test.mp3", "wb+");
-	fwrite((void*)outBuffer, sizeof(unsigned char), totalBytes, out);
-	
-	// flush buffers
-	int bytesFlushed = lame_encode_flush(gfp, outBuffer, bufferSize);
-	cout << "Bytes flushed: " << bytesFlushed << endl;
-	fwrite((void*)outBuffer, sizeof(unsigned char), bytesFlushed, out);
+	//ret = encode_chunk_to_buffer(numSamples / 2 + 1, numSamples - 1, gfp, leftPcm, rightPcm,
+	//	&outBuffer[totalBytes], bufferSize, bytesWritten);
+	//cout << bytesWritten << endl;
+	//totalBytes += bytesWritten;
 
-	lame_mp3_tags_fid(gfp, out);
-	fclose(out);
+	//cout << "Total bytes: " << totalBytes << endl;
 
-	delete[] outBuffer;
+	//// save to file
+	//FILE *out = fopen("test.mp3", "wb+");
+	//fwrite((void*)outBuffer, sizeof(unsigned char), totalBytes, out);
+	//
+	//// flush buffers
+	//int bytesFlushed = lame_encode_flush(gfp, outBuffer, bufferSize);
+	//cout << "Bytes flushed: " << bytesFlushed << endl;
+	//fwrite((void*)outBuffer, sizeof(unsigned char), bytesFlushed, out);
+
+	//lame_mp3_tags_fid(gfp, out);
+	//fclose(out);
+
+	//delete[] outBuffer;
 
 	cout << "Done." << endl;
 	
