@@ -184,11 +184,22 @@ void *encode_chunk_to_buffer_worker(void* arg)
 {
 	CHNK_TO_BFR_ARGS *args = (CHNK_TO_BFR_ARGS*)arg;
 	int numSamples = args->lastSample - args->firstSample;
-	int ret = lame_encode_buffer(args->gfp, args->leftPcm, args->rightPcm, numSamples,
-		args->outBuffer, args->outBufferSize);
+
+	printf("+--------------------------------+\n"
+		   "| Thread Samples %d-%d (%d)          \n" 
+		   "| GFP addr. 0x%x                   \n"
+		   "| PCM_L addr. 0x%x                 \n"
+		   "| PCM_R addr. 0x%x                 \n"
+		   "| outBuffer addr. 0x%x             \n"
+		   "| outBufferSize %d               \n",
+		   "+--------------------------------+\n",
+		   args->firstSample, args->lastSample, numSamples, args->gfp, args->leftPcm, args->rightPcm,
+		   args->outBuffer, args->outBufferSize);
+
+	int ret = lame_encode_buffer(args->gfp, &(args->leftPcm[args->firstSample]), &(args->rightPcm[args->firstSample]),
+		numSamples,	args->outBuffer, args->outBufferSize);
 
 	*(args->bytesWritten) = ret;
-	printf("Thread samples %d-%d: Wrote %d bytes.\n", args->firstSample, args->lastSample, *(args->bytesWritten));
 	return NULL;
 }
 
@@ -302,6 +313,8 @@ int encode_chunks_to_file_multithreaded(lame_global_flags *gfp, const WAV_HDR *h
 			exit(ret);
 		}
 	}
+
+	exit(0);
 	
 	// write chunk buffers to file
 	FILE *out = fopen(filename, "wb+");
@@ -370,7 +383,9 @@ int main(void)
 	}*/
 
 	int written = 0;
-	ret = encode_chunks_to_file_multithreaded(gfp, hdr, leftPcm, rightPcm, written, "test.mp3", 1);
+	lame_set_num_channels(gfp, hdr->numChannels);
+	lame_set_num_samples(gfp, hdr->dataSize / hdr->bytesPerSample);
+	ret = encode_chunks_to_file_multithreaded(gfp, hdr, leftPcm, rightPcm, written, "test.mp3", 2);
 
 
 	//int numSamples = hdr->dataSize / hdr->bytesPerSample;
