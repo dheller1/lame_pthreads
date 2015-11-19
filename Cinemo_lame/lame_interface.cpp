@@ -13,9 +13,6 @@ int encode_to_file(lame_global_flags *gfp, const FMT_DATA *hdr, const short *lef
 	if (!(mp3size > 0)) {
 		delete[] mp3Buffer;
 		cerr << "No data was encoded by lame_encode_buffer. Return code: " << mp3size << endl;
-		cerr << "Diag: numSamples " << numSamples << ", mp3BufferSize " << mp3BufferSize << endl;
-		cerr << "      numChannels " << lame_get_num_channels(gfp) << ", bytesPerSample " << hdr->wBlockAlign << endl;
-		cerr << "      right Pcm addr " << (int)rightPcm << endl;
 		return EXIT_FAILURE;
 	}
 

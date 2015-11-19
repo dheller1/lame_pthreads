@@ -3,7 +3,7 @@
 // function implementations
 int read_wave_header(ifstream &file, FMT_DATA *&hdr, int &iDataSize, int &iDataOffset)
 {
-	if (!file.is_open()) return NULL; // check if file is open
+	if (!file.is_open()) return EXIT_FAILURE; // check if file is open
 	file.seekg(0, ios::beg); // rewind file
 
 	ANY_CHUNK_HDR chunkHdr;
@@ -40,7 +40,6 @@ int read_wave_header(ifstream &file, FMT_DATA *&hdr, int &iDataSize, int &iDataO
 
 	// finally, look for 'data' chunk
 	bool bFoundData = false;
-	int iSkippedChunks = 0;
 	while (!bFoundData && !file.eof()) {
 		//printf("Reading chunk at 0x%X:", (int)file.tellg());
 		file.read((char*)&chunkHdr, sizeof(ANY_CHUNK_HDR));
