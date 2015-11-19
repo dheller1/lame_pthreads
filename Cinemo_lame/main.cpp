@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include "lame.h"
+#include "pthread.h"
 
 using namespace std;
 
@@ -155,6 +156,17 @@ int encode_to_file(lame_global_flags *gfp, const WAV_HDR *hdr, const short *left
 	return EXIT_SUCCESS;
 }
 
+typedef struct {
+	int firstSample;
+	int lastSample;
+	lame_global_flags *gfp;
+	const short *leftPcm;
+	const short *rightPcm;
+	unsigned char *outBuffer;
+	int outBufferSize;
+	int *bytesWritten;
+} CHNK_TO_BFR_ARGS;
+
 // Ensure that all settings in GFP have been set correctly before calling this routine!
 int encode_chunk_to_buffer(int firstSample, int lastSample, lame_global_flags *gfp, const short *leftPcm,
 	const short *rightPcm, unsigned char* outBuffer, const int outBufferSize, int &bytesWritten)
@@ -166,6 +178,18 @@ int encode_chunk_to_buffer(int firstSample, int lastSample, lame_global_flags *g
 	bytesWritten = lame_encode_buffer(gfp, &leftPcm[firstSample], &rightPcm[firstSample], numSamples, outBuffer,
 		outBufferSize);
 	return EXIT_SUCCESS;
+}
+
+void *encode_chunk_to_buffer_worker(void* arg)
+{
+	CHNK_TO_BFR_ARGS *args = (CHNK_TO_BFR_ARGS*)arg;
+	int numSamples = args->lastSample - args->firstSample;
+	int ret = lame_encode_buffer(args->gfp, args->leftPcm, args->rightPcm, numSamples,
+		args->outBuffer, args->outBufferSize);
+
+	*(args->bytesWritten) = ret;
+	printf("Thread samples %d-%d: Wrote %d bytes.\n", args->firstSample, args->lastSample, *(args->bytesWritten));
+	return NULL;
 }
 
 int encode_chunks_to_file(lame_global_flags *gfp, const WAV_HDR *hdr, const short *leftPcm, const short *rightPcm,
@@ -227,6 +251,89 @@ int encode_chunks_to_file(lame_global_flags *gfp, const WAV_HDR *hdr, const shor
 	return EXIT_SUCCESS;
 }
 
+int encode_chunks_to_file_multithreaded(lame_global_flags *gfp, const WAV_HDR *hdr, const short *leftPcm,
+	const short *rightPcm, int &bytesWritten, const char *filename, unsigned short numThreads = 1)
+{
+	int numChunks = numThreads;
+	int numSamples = hdr->dataSize / hdr->bytesPerSample;
+	int samplesPerChunk = numSamples / numChunks + 1;
+	int chunkSize = samplesPerChunk * 5 / 4 + 7200; // worst case estimate in bytes
+
+	bytesWritten = 0;
+
+	// allocate threads array and argument structs
+	pthread_t *threads = new pthread_t[numThreads];
+	CHNK_TO_BFR_ARGS *threadArgs = (CHNK_TO_BFR_ARGS*) malloc(numThreads * sizeof(CHNK_TO_BFR_ARGS));
+
+	// allocate output buffers
+	unsigned char **outBuffers = new unsigned char*[numSamples];
+	int *writtenInChunk = new int[numSamples];
+	for (int i = 0; i < numChunks; i++) {
+		outBuffers[i] = new unsigned char[chunkSize];
+	}
+
+	// assemble thread argument structs
+	for (int i = 0; i < numChunks; i++) {
+		int firstSample = i * samplesPerChunk;
+		int lastSample = firstSample + samplesPerChunk - 1;
+		if (lastSample >= numSamples) lastSample = numSamples - 1;
+
+		// assemble argument struct
+		threadArgs[i].firstSample = firstSample;
+		threadArgs[i].lastSample = lastSample;
+		threadArgs[i].gfp = gfp;
+		threadArgs[i].leftPcm = leftPcm;
+		threadArgs[i].rightPcm = rightPcm;
+		threadArgs[i].outBuffer = outBuffers[i];
+		threadArgs[i].outBufferSize = chunkSize;
+		threadArgs[i].bytesWritten = &writtenInChunk[i];
+	}
+
+	// spawn threads
+	for (int i = 0; i < numChunks; i++) {
+		int ret = pthread_create(&threads[i], NULL, encode_chunk_to_buffer_worker, (void*)&threadArgs[i]);
+	}
+
+	// let them do work and synchronize
+	for (int i = 0; i < numChunks; i++) {
+		int ret = pthread_join(threads[i], NULL);
+		if (ret != 0) {
+			cerr << "A POSIX thread error occured. Quitting." << endl;
+			exit(ret);
+		}
+	}
+	
+	// write chunk buffers to file
+	FILE *out = fopen(filename, "wb+");
+	for (int i = 0; i < numChunks; i++) {
+		fwrite((void*)outBuffers[i], sizeof(unsigned char), writtenInChunk[i], out);
+		bytesWritten += writtenInChunk[i];
+	}
+
+
+	// clear temporary buffers
+	for (int i = 0; i < numChunks; i++) {
+		delete[] outBuffers[i];
+	}
+	delete[] outBuffers;
+	delete[] writtenInChunk;
+
+	// flush buffers
+	unsigned char *flushBuffer = new unsigned char[32768]; // just provide enough buffer size, lower might be fine
+	int flushSize = lame_encode_flush(gfp, flushBuffer, 32768);
+
+	fwrite((void*)flushBuffer, sizeof(unsigned char), flushSize, out);
+	bytesWritten += flushSize;
+	delete[] flushBuffer;
+
+	lame_mp3_tags_fid(gfp, out);
+
+	fclose(out);
+
+	cout << "Wrote " << bytesWritten << " bytes in total." << endl;
+	return EXIT_SUCCESS;
+}
+
 int main(void)
 {
 	WAV_HDR *hdr=NULL;
@@ -263,7 +370,7 @@ int main(void)
 	}*/
 
 	int written = 0;
-	ret = encode_chunks_to_file(gfp, hdr, leftPcm, rightPcm, written, "test.mp3", 8);
+	ret = encode_chunks_to_file_multithreaded(gfp, hdr, leftPcm, rightPcm, written, "test.mp3", 1);
 
 
 	//int numSamples = hdr->dataSize / hdr->bytesPerSample;
