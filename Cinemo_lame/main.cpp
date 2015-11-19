@@ -6,6 +6,12 @@
 
 #include "lame_interface.h"
 
+#ifdef WIN32
+#define PATHSEP "\\"
+#else
+#define PATHSEP "/"
+#endif
+
 using namespace std;
 
 /* Used for filtering filename extensions. Returns true if 'fullString' ends with
@@ -68,9 +74,9 @@ int main(int argc, char **argv)
 	list<string> files = parse_directory(argv[1]);
 	vector<string> wavFiles;
 	for (list<string>::iterator it = files.begin(); it != files.end(); it++) {
-		// check if it's a wave file
+		// check if it's a wave file and add path
 		if (string_ends_with(*it, string(".wav"))) {
-			wavFiles.push_back(*it);
+			wavFiles.push_back(string(argv[1]) + string(PATHSEP) + *it);
 		}
 	}
 	int numFiles = wavFiles.size();
