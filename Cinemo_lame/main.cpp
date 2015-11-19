@@ -25,6 +25,10 @@ typedef struct {
 int read_wave(const char *filename, WAV_HDR* &hdr, short* &leftPcm, short* &rightPcm);
 int check_wave_header(const WAV_HDR *hdr);
 void get_pcm_channels_from_wave(ifstream &file, const WAV_HDR* hdr, short* &leftPcm, short* &rightPcm);
+int encode_to_file(lame_global_flags *gfp, const WAV_HDR *hdr, const short *leftPcm, const short *rightPcm,
+	const char *filename);
+int encode_chunk_to_buffer(int firstSample, int lastSample, lame_global_flags *gfp, const WAV_HDR *hdr,
+	const short *leftPcm, const short *rightPcm, unsigned char* outBuffer, const int outBufferSize, int &bytesWritten);
 
 // function implementations
 WAV_HDR* read_wave_header(ifstream &file)
@@ -111,6 +115,58 @@ int read_wave(const char *filename, WAV_HDR* &hdr, short* &leftPcm, short* &righ
 	return EXIT_FAILURE;
 }
 
+int encode_to_file(lame_global_flags *gfp, const WAV_HDR *hdr, const short *leftPcm, const short *rightPcm,
+	const char *filename)
+{
+	int numSamples = hdr->dataSize / hdr->bytesPerSample;
+
+	// finish configuration in gfp
+	lame_set_num_samples(gfp, numSamples);
+	lame_set_num_channels(gfp, hdr->numChannels);
+
+	int mp3BufferSize = numSamples * 5 / 4 + 7200; // worst case estimate
+	unsigned char *mp3Buffer = new unsigned char[mp3BufferSize];
+
+	// call to lame_encode_buffer
+	int mp3size = lame_encode_buffer(gfp, (short*)leftPcm, (short*)rightPcm, numSamples, mp3Buffer, mp3BufferSize);
+	if (!mp3size > 0) {
+		delete[] mp3Buffer;
+		return EXIT_FAILURE;
+	}
+
+	// write to file
+	FILE *out = fopen(filename, "wb+");
+	fwrite((void*)mp3Buffer, sizeof(unsigned char), mp3size, out);
+
+	// call to lame_encode_flush
+	int flushSize = lame_encode_flush(gfp, mp3Buffer, mp3BufferSize);
+
+	// write flushed buffers to file
+	fwrite((void*)mp3Buffer, sizeof(unsigned char), flushSize, out);
+
+	// call to lame_mp3_tags_fid (might be omitted)
+	lame_mp3_tags_fid(gfp, out);
+
+	fclose(out);
+	delete[] mp3Buffer;
+
+	cout << "Wrote " << mp3size + flushSize << " bytes." << endl;
+	return EXIT_SUCCESS;
+}
+
+// Ensure that all settings in GFP have been set correctly before calling this routine!
+int encode_chunk_to_buffer(int firstSample, int lastSample, lame_global_flags *gfp, const WAV_HDR *hdr,
+	const short *leftPcm, const short *rightPcm, unsigned char* outBuffer, const int outBufferSize, int &bytesWritten)
+{
+	if (lastSample - firstSample < 0) return EXIT_FAILURE;
+
+	int numSamples = lastSample - firstSample;
+
+	bytesWritten = lame_encode_buffer(gfp, &leftPcm[firstSample], &rightPcm[firstSample], numSamples, outBuffer,
+		outBufferSize);
+	return EXIT_SUCCESS;
+}
+
 int main(void)
 {
 	WAV_HDR *hdr=NULL;
@@ -140,32 +196,13 @@ int main(void)
 	}
 
 	// encode to mp3
-	int numSamples = hdr->dataSize / hdr->bytesPerSample;
+	ret = encode_to_file(gfp, hdr, leftPcm, rightPcm, "test.mp3");
+	if (ret != EXIT_SUCCESS) {
+		cerr << "Unable to encode to mp3." << endl;
+		return EXIT_FAILURE;
+	}
 
-	lame_set_num_samples(gfp, numSamples);
-	lame_set_num_channels(gfp, hdr->numChannels);
-
-	int mp3BufferSize = numSamples * 5 / 4 + 7200; // worst case estimate
-	unsigned char *mp3Buffer = new unsigned char[mp3BufferSize];
-
-	int mp3size = lame_encode_buffer(gfp, (short*)leftPcm, (short*)rightPcm, numSamples,
-		mp3Buffer, mp3BufferSize);
-	cout << "Return code of lame_encode_buffer: " << mp3size << endl;
-	
-	// write output
-	FILE* out = fopen("test.mp3", "wb+");
-	fwrite((void*)mp3Buffer, 1, mp3size, out);
-
-	// flush buffers
-	ret = lame_encode_flush(gfp, mp3Buffer, mp3BufferSize);
-	cout << "Return code of lame_encode_flush:  " << ret << endl;
-
-	fwrite((void*)mp3Buffer, sizeof(unsigned char), ret, out);
-	lame_mp3_tags_fid(gfp, out);
-	
-	fclose(out);
-
-	delete[] mp3Buffer;
+	cout << "Done." << endl;
 	
 	lame_close(gfp); // cleanup
 	return EXIT_SUCCESS;
