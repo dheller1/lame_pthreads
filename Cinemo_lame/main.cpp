@@ -114,9 +114,13 @@ int main(int argc, char **argv)
 	}
 
 	// write statistics
+	int iProcessedTotal = 0;
 	for (int i = 0; i < NUM_THREADS; i++) {
 		cout << "Thread " << i << " processed " << threadArgs[i].iProcessedFiles << " files." << endl;
+		iProcessedTotal += threadArgs[i].iProcessedFiles;
 	}
+
+	cout << "Converted " << iProcessedTotal << " out of " << numFiles << " files in total." << endl;
 
 	delete[] threads;
 	delete[] threadArgs;

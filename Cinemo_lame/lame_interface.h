@@ -50,8 +50,8 @@ typedef struct {
  *  Calls lame_encode_buffer, lame_encode_flush, and lame_mp3_tags_fid internally for a complete conversion
  *  process.
  */
-int encode_to_file(lame_global_flags *gfp, const WAV_HDR *hdr, const short *leftPcm, const short *rightPcm,
-	const char *filename);
+int encode_to_file(lame_global_flags *gfp, const FMT_DATA *hdr, const short *leftPcm, const short *rightPcm,
+	const int iDataSize, const char *filename);
 
 /* OBSOLETE - encode_chunk_to_buffer
  *  Encodes only a chunk of PCM input data to an MP3 output data buffer. This routine is working fine but

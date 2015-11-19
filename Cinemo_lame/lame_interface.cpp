@@ -1,13 +1,13 @@
 #include "lame_interface.h"
 
-int encode_to_file(lame_global_flags *gfp, const WAV_HDR *hdr, const short *leftPcm, const short *rightPcm,
-	const char *filename)
+int encode_to_file(lame_global_flags *gfp, const FMT_DATA *hdr, const short *leftPcm, const short *rightPcm,
+	const int iDataSize, const char *filename)
 {
-	int numSamples = hdr->dataSize / hdr->bytesPerSample;
+	int numSamples = iDataSize / hdr->wBlockAlign;
 
 	// finish configuration in gfp
 	lame_set_num_samples(gfp, numSamples);
-	lame_set_num_channels(gfp, hdr->numChannels);
+	lame_set_num_channels(gfp, hdr->wChannels);
 
 	int mp3BufferSize = numSamples * 5 / 4 + 7200; // worst case estimate
 	unsigned char *mp3Buffer = new unsigned char[mp3BufferSize];
@@ -259,7 +259,7 @@ void *complete_encode_worker(void* arg)
 		string sMyFileOut = sMyFile.substr(0, sMyFile.length() - 3) + "mp3";
 
 		// start working
-		WAV_HDR *hdr = NULL;
+		FMT_DATA *hdr = NULL;
 		short *leftPcm = NULL, *rightPcm = NULL;
 		// init encoding params
 		lame_global_flags *gfp = lame_init();
@@ -278,14 +278,15 @@ void *complete_encode_worker(void* arg)
 #ifdef __VERBOSE_
 		printf("Parsing %s ...\n", sMyFile.c_str());
 #endif
-		ret = read_wave(sMyFile.c_str(), hdr, leftPcm, rightPcm);
+		int iDataSize = -1;
+		ret = read_wave(sMyFile.c_str(), hdr, leftPcm, rightPcm, iDataSize);
 		if (ret != EXIT_SUCCESS) {
-			printf("Error in file %s! Skipping.\n", sMyFile.c_str());
+			printf("Error in file %s. Skipping.\n", sMyFile.c_str());
 			continue; // see if there's more to do
 		}
 
 		// encode to mp3
-		ret = encode_to_file(gfp, hdr, leftPcm, rightPcm, sMyFileOut.c_str());
+		ret = encode_to_file(gfp, hdr, leftPcm, rightPcm, iDataSize, sMyFileOut.c_str());
 		if (ret != EXIT_SUCCESS) {
 			cerr << "Unable to encode mp3." << endl;
 			continue;

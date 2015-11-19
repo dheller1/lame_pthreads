@@ -15,7 +15,7 @@ typedef struct {
 	int fileLen; // length of file minus 8.
 	char wID[8]; // "WAVEfmt "
 	int pcmHeaderLength; // 16
-	short fmtVersion;
+	short fmtTag;
 	short numChannels; // 1: Mono, 2: Stereo
 	int sampleRate; // samples per sec
 	int byteRate; // Bytes per sec
@@ -24,6 +24,28 @@ typedef struct {
 	char dID[4]; // "data"
 	int dataSize; // size of data array
 } WAV_HDR;
+
+typedef struct {
+	char rID[4]; // "RIFF"
+	int fileLen; // length of file minus 8 for "RIFF" and fileLen.
+	char wID[4]; // "WAVE"
+} RIFF_HDR;
+
+typedef struct {
+	char ID[4]; // "fmt "
+	long chunkSize; // should be 16
+	short wFmtTag; // 0x01 for PCM - other modes unsupported
+	unsigned short wChannels; // number of channels (1 mono, 2 stereo)
+	unsigned long dwSamplesPerSec; // e.g. 44100
+	unsigned long dwBytesPerSec;   // e.g. 4*44100
+	unsigned short wBlockAlign; // bytes per sample (all channels, e.g. 4)
+	unsigned short wBitsPerSample; // bits per sample and channel, e.g. 16
+} FMT_DATA;
+
+typedef struct {
+	char ID[4]; // any identifier
+	long chunkSize;
+} ANY_CHUNK_HDR;
 
 
 /* read_wave
@@ -35,9 +57,10 @@ typedef struct {
  */
 int read_wave(
 	const char*			filename,			/* file to open */
-	WAV_HDR*			&hdr,				/* stores header info here (will be allocated) */
+	FMT_DATA*			&hdr,				/* stores header info here (will be allocated) */
 	short*				&leftPcm,			/* stores left (or mono) PCM channel here */
-	short*				&rightPcm			/* stores right PCM channel (stereo only) here */
+	short*				&rightPcm,			/* stores right PCM channel (stereo only) here */
+	int					&iDataSize			/* size of data array */
 );
 
 /* read_wave_header
@@ -46,7 +69,7 @@ int read_wave(
  *  Return value:
  *    Pointer to newly allocated WAV_HDR struct (be sure to delete later).
  */
-WAV_HDR* read_wave_header(
+FMT_DATA* read_wave_header(
 	ifstream			&file				/* file stream to parse from (must be opened for reading) */
 );
 
@@ -63,6 +86,9 @@ int check_wave_header(
 	const WAV_HDR*		hdr					/* pointer to header struct which will be validated */
 );
 
+int check_riff_header(const RIFF_HDR *rHdr);
+int check_format_data(const FMT_DATA *hdr);
+
 /* get_pcm_channels_from_wave
 *  Allocates buffers for left and (if stereo) right PCM channels and parses data from filestream.
 *  Header hdr must have been read before.
@@ -73,9 +99,11 @@ int check_wave_header(
 */
 void get_pcm_channels_from_wave(
 	ifstream			&file,				/* file stream to parse from (must be opened for reading) */
-	const WAV_HDR*		hdr,				/* pointer to header struct that's already been read */
+	const FMT_DATA*		hdr,				/* pointer to format struct that's already been read */
 	short*				&leftPcm,			/* stores left PCM channel here (will be allocated) */
-	short*				&rightPcm			/* stores right PCM channel here (will be allocated for stereo files)*/
+	short*				&rightPcm,			/* stores right PCM channel here (will be allocated for stereo files)*/
+	const int			iDataSize,			/* size of PCM data array */
+	const int			iDataOffset			/* first PCM array byte in file*/
 );
 
 #endif //__WAVE_H_
