@@ -56,7 +56,7 @@ list<string> parse_directory(const char *dirname)
 
 int main(int argc, char **argv)
 {
-	const int NUM_THREADS = 3;
+	const int NUM_THREADS = 1;
 	if (argc < 2) {
 		cerr << "Usage: " << argv[0] << " PATH" << endl;
 		cerr << "   PATH will be searched for .WAV files which will be converted to .MP3 format." << endl;
@@ -68,9 +68,9 @@ int main(int argc, char **argv)
 	list<string> files = parse_directory(argv[1]);
 	vector<string> wavFiles;
 	for (list<string>::iterator it = files.begin(); it != files.end(); it++) {
-		// check if it's a wave file
+		// check if it's a wave file and prepend path
 		if (string_ends_with(*it, string(".wav"))) {
-			wavFiles.push_back(*it);
+			wavFiles.push_back( string(argv[1]) + string("\\") + *it);
 		}
 	}
 	int numFiles = wavFiles.size();
