@@ -35,7 +35,9 @@ int encode_to_file(lame_global_flags *gfp, const WAV_HDR *hdr, const short *left
 	fclose(out);
 	delete[] mp3Buffer;
 
+#ifdef __VERBOSE_
 	cout << "Wrote " << mp3size + flushSize << " bytes." << endl;
+#endif
 	return EXIT_SUCCESS;
 }
 
@@ -57,6 +59,7 @@ void *encode_chunk_to_buffer_worker(void* arg)
 	CHNK_TO_BFR_ARGS *args = (CHNK_TO_BFR_ARGS*)arg;
 	int numSamples = args->lastSample - args->firstSample;
 
+#ifdef __VERBOSE_
 	printf("+--------------------------------+\n"
 		"| Thread Samples %d-%d (%d)          \n"
 		"| GFP addr. 0x%x                   \n"
@@ -67,6 +70,7 @@ void *encode_chunk_to_buffer_worker(void* arg)
 		"+--------------------------------+\n",
 		args->firstSample, args->lastSample, numSamples, args->gfp, args->leftPcm, args->rightPcm,
 		args->outBuffer, args->outBufferSize);
+#endif
 
 	int ret = lame_encode_buffer(args->gfp, &(args->leftPcm[args->firstSample]), &(args->rightPcm[args->firstSample]),
 		numSamples, args->outBuffer, args->outBufferSize);
@@ -99,8 +103,10 @@ int encode_chunks_to_file(lame_global_flags *gfp, const WAV_HDR *hdr, const shor
 
 		int ret = encode_chunk_to_buffer(firstSample, lastSample, gfp, leftPcm, rightPcm, outBuffers[i],
 			chunkSize, writtenInChunk[i]);
+#ifdef __VERBOSE_
 		cout << "Chunk " << i << " (samples " << firstSample << "-" << lastSample << "): Wrote "
 			<< writtenInChunk[i] << " bytes." << endl;
+#endif
 	}
 
 	// write chunk buffers to file
@@ -129,8 +135,9 @@ int encode_chunks_to_file(lame_global_flags *gfp, const WAV_HDR *hdr, const shor
 	lame_mp3_tags_fid(gfp, out);
 
 	fclose(out);
-
+#ifdef __VERBOSE_
 	cout << "Wrote " << bytesWritten << " bytes in total." << endl;
+#endif
 	return EXIT_SUCCESS;
 }
 
@@ -215,7 +222,9 @@ int encode_chunks_to_file_multithreaded(lame_global_flags *gfp, const WAV_HDR *h
 	delete[] threads;
 	free(threadArgs);
 
+#ifdef __VERBOSE_
 	cout << "Wrote " << bytesWritten << " bytes in total." << endl;
+#endif
 	return EXIT_SUCCESS;
 }
 
@@ -223,18 +232,22 @@ void *complete_encode_worker(void* arg)
 {
 	ENC_WRK_ARGS *args = (ENC_WRK_ARGS*)arg; // parse argument struct
 
-	int iNumFilesProcessed = 0;
 
 	while (true) {
+#ifdef __VERBOSE_
 		cout << "Checking for work\n";
+#endif
 		// determine which file to process next
 		bool bFoundWork = false;
 		int iFileIdx = -1;
 		for (int i = 0; i < args->iNumFiles; i++) {
 			if (!args->pbFilesFinished[i]) {
-				// LOCK HERE
+				
+				// NORMALLY: LOCK HERE
 				args->pbFilesFinished[i] = true; // mark as being worked on
 				// UNLOCK
+				// but this is a binary operation, so there shouldn't be any conflicts!
+				
 				iFileIdx = i;
 				bFoundWork = true;
 				break;
@@ -242,9 +255,6 @@ void *complete_encode_worker(void* arg)
 		}
 
 		if (!bFoundWork) {// done yet?
-			ostringstream out;
-			out << "Thread " << args->iThreadId << " processed " << iNumFilesProcessed << " files." << endl;
-			printf(out.str().c_str());
 			return NULL; // break
 		}
 		string sMyFile = args->pFilenames->at(iFileIdx);
@@ -262,12 +272,14 @@ void *complete_encode_worker(void* arg)
 		// check params
 		int ret = lame_init_params(gfp);
 		if (ret != 0) {
-			cerr << "Invalid encoding parameters! Quitting now." << endl;
-			exit(0);
+			cerr << "Invalid encoding parameters! Skipping file." << endl;
+			continue;
 		}
 
 		// parse wave file
+#ifdef __VERBOSE_
 		printf("Parsing %s ...\n", sMyFile.c_str());
+#endif
 		ret = read_wave(sMyFile.c_str(), hdr, leftPcm, rightPcm);
 		if (ret != EXIT_SUCCESS) {
 			printf("Error in file %s! Skipping.\n", sMyFile.c_str());
@@ -281,8 +293,11 @@ void *complete_encode_worker(void* arg)
 			continue;
 		}
 
-		++iNumFilesProcessed;
+		printf("[:%i][ok] .... %s\n", args->iThreadId, sMyFile.c_str());
+		++args->iProcessedFiles;
 
 		lame_close(gfp);
 	}
+
+	pthread_exit((void*)0);
 }

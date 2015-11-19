@@ -28,6 +28,7 @@ typedef struct {
 	bool *pbFilesFinished;
 	int iNumFiles;
 	int iThreadId;
+	int iProcessedFiles;
 } ENC_WRK_ARGS;
 
 /////////////////////

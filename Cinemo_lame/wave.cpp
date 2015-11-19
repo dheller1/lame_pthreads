@@ -8,11 +8,11 @@ WAV_HDR* read_wave_header(ifstream &file)
 	if (!file.is_open()) return NULL; // check if file is open
 	file.seekg(0, ios::beg); // rewind file
 
+#ifdef __VERBOSE_
 	cout << "Attempting to read header (" << sizeof(WAV_HDR) << " bytes)..." << endl;
+#endif
 	file.read((char*)hdr, sizeof(WAV_HDR));
-
-	check_wave_header(hdr);
-
+	
 	return hdr;
 }
 
@@ -23,6 +23,7 @@ int check_wave_header(const WAV_HDR *hdr)
 	if (0 != strncmp(hdr->wID, "WAVEfmt ", 8)) return EXIT_FAILURE;
 	if (0 != strncmp(hdr->dID, "data", 4)) return EXIT_FAILURE;
 
+#ifdef __VERBOSE_
 	cout << "Length of file-8:  " << hdr->fileLen << endl; // file length
 	cout << "PCM header length: " << hdr->pcmHeaderLength << endl;
 	cout << "Format version:    " << hdr->fmtVersion << endl;
@@ -35,6 +36,7 @@ int check_wave_header(const WAV_HDR *hdr)
 
 	cout << "WAV file seems okay." << endl;
 	cout << "Number of samples (per channel): " << hdr->dataSize / hdr->bytesPerSample << endl;
+#endif
 	return EXIT_SUCCESS;
 }
 
@@ -60,7 +62,9 @@ void get_pcm_channels_from_wave(ifstream &file, const WAV_HDR* hdr, short* &left
 			file.read((char*)&rightPcm[idx], hdr->bytesPerSample / hdr->numChannels);
 	}
 
+#ifdef __VERBOSE_
 	cout << "File parsed successfully." << endl;
+#endif
 }
 
 int read_wave(const char *filename, WAV_HDR* &hdr, short* &leftPcm, short* &rightPcm)
@@ -72,11 +76,14 @@ int read_wave(const char *filename, WAV_HDR* &hdr, short* &leftPcm, short* &righ
 		// determine size and allocate buffer
 		inFile.seekg(0, ios::end);
 		size = inFile.tellg();
-
+#ifdef __VERBOSE_
 		cout << "Opened file. Allocating " << size << " bytes." << endl;
+#endif
 
 		// parse file
 		hdr = read_wave_header(inFile);
+		if (EXIT_SUCCESS != check_wave_header(hdr))
+			return EXIT_FAILURE;
 		get_pcm_channels_from_wave(inFile, hdr, leftPcm, rightPcm);
 		inFile.close();
 

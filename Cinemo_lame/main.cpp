@@ -2,7 +2,7 @@
 #include <list>
 #include <string>
 #include <vector>
-#include "dirent.h"
+#include "dirent.h"	/* this is used to get cross-platform directory listings without Boost. */
 
 #include "lame_interface.h"
 
@@ -29,6 +29,9 @@ bool string_ends_with(const string &fullString, const string &subString)
 	}
 }
 
+/* Parse a directory given by dirname and return a list of
+ * filenames and subfolders within this directory. 
+ */
 list<string> parse_directory(const char *dirname)
 {
 	DIR *dir;
@@ -42,19 +45,25 @@ list<string> parse_directory(const char *dirname)
 		}
 		closedir(dir);
 	} else {
-		cerr << "Unable to parse directory." << endl;
+		cerr << "FATAL: Unable to parse directory." << endl;
+		exit(EXIT_FAILURE);
 	}
 
 	return dirEntries;
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
-	const int NUM_THREADS = 2;
+	const int NUM_THREADS = 3;
+	if (argc < 2) {
+		cerr << "Usage: " << argv[0] << " PATH" << endl;
+		cerr << "   PATH will be searched for .WAV files which will be converted to .MP3 format." << endl;
+		return EXIT_FAILURE;
+	}
 	cout << "LAME version: " << get_lame_version() << endl;
 
 	// parse directory
-	list<string> files = parse_directory(".");
+	list<string> files = parse_directory(argv[1]);
 	vector<string> wavFiles;
 	for (list<string>::iterator it = files.begin(); it != files.end(); it++) {
 		// check if it's a wave file
@@ -62,7 +71,6 @@ int main(void)
 			wavFiles.push_back(*it);
 		}
 	}
-
 	int numFiles = wavFiles.size();
 
 	cout << "Found " << numFiles << " .wav file(s) in directory." << endl;
@@ -81,6 +89,7 @@ int main(void)
 		threadArgs[i].pFilenames = &wavFiles;
 		threadArgs[i].pbFilesFinished = pbFilesFinished;
 		threadArgs[i].iThreadId = i;
+		threadArgs[i].iProcessedFiles = 0;
 	}
 
 	// create threads
@@ -96,6 +105,10 @@ int main(void)
 		}
 	}
 
+	// write statistics
+	for (int i = 0; i < NUM_THREADS; i++) {
+		cout << "Thread " << i << " processed " << threadArgs[i].iProcessedFiles << " files." << endl;
+	}
 
 	delete[] threads;
 	delete[] threadArgs;
