@@ -116,7 +116,6 @@ int encode_chunks_to_file(lame_global_flags *gfp, const WAV_HDR *hdr, const shor
 		bytesWritten += writtenInChunk[i];
 	}
 
-
 	// clear temporary buffers
 	for (int i = 0; i < numChunks; i++) {
 		delete[] outBuffers[i];
@@ -232,7 +231,6 @@ void *complete_encode_worker(void* arg)
 {
 	ENC_WRK_ARGS *args = (ENC_WRK_ARGS*)arg; // parse argument struct
 
-
 	while (true) {
 #ifdef __VERBOSE_
 		cout << "Checking for work\n";
@@ -246,7 +244,7 @@ void *complete_encode_worker(void* arg)
 				// NORMALLY: LOCK HERE
 				args->pbFilesFinished[i] = true; // mark as being worked on
 				// UNLOCK
-				// but this is a binary operation, so there shouldn't be any conflicts!
+				// but this is an atomic operation, so there shouldn't be any conflicts!
 				
 				iFileIdx = i;
 				bFoundWork = true;

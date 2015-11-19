@@ -8,6 +8,9 @@
 
 using namespace std;
 
+/* Used for filtering filename extensions. Returns true if 'fullString' ends with
+ * 'subString', otherwise false.
+ */
 bool string_ends_with(const string &fullString, const string &subString)
 {
 	if (subString.length() > fullString.length()) return false;
@@ -18,7 +21,6 @@ bool string_ends_with(const string &fullString, const string &subString)
 			if ('A' <= fullString_l[i] && fullString_l[i] <= 'Z')
 				fullString_l[i] = fullString_l[i] - ('Z' - 'z');
 		}
-
 		string subString_l = subString;
 		for (unsigned int i = 0; i < subString_l.length(); i++) {
 			if ('A' <= subString_l[i] && subString_l[i] <= 'Z')
@@ -92,12 +94,12 @@ int main(int argc, char **argv)
 		threadArgs[i].iProcessedFiles = 0;
 	}
 
-	// create threads
+	// create worker threads
 	for (int i = 0; i < NUM_THREADS; i++) {
 		pthread_create(&threads[i], NULL, complete_encode_worker, (void*)&threadArgs[i]);
 	}
 
-	// join threads
+	// synchronize / join threads
 	for (int i = 0; i < NUM_THREADS; i++) {
 		int ret = pthread_join(threads[i], NULL);
 		if (ret != 0) {
