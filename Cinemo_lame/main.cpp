@@ -3,6 +3,11 @@
 #include <fstream>
 #include "lame.h"
 #include "pthread.h"
+#include "dirent.h"
+#include <list>
+#include <string>
+#include <sstream>
+#include <vector>
 
 using namespace std;
 
@@ -313,8 +318,6 @@ int encode_chunks_to_file_multithreaded(lame_global_flags *gfp, const WAV_HDR *h
 			exit(ret);
 		}
 	}
-
-	exit(0);
 	
 	// write chunk buffers to file
 	FILE *out = fopen(filename, "wb+");
@@ -342,90 +345,182 @@ int encode_chunks_to_file_multithreaded(lame_global_flags *gfp, const WAV_HDR *h
 	lame_mp3_tags_fid(gfp, out);
 
 	fclose(out);
+	delete[] threads;
+	free(threadArgs);
 
 	cout << "Wrote " << bytesWritten << " bytes in total." << endl;
 	return EXIT_SUCCESS;
 }
 
-int main(void)
+bool string_ends_with(const string &fullString, const string &subString)
 {
-	WAV_HDR *hdr=NULL;
-	short *leftPcm=NULL, *rightPcm=NULL;
-	int ret;
-	cout << "LAME version: " << get_lame_version() << endl;
+	if (subString.length() > fullString.length()) return false;
+	else {
+		// lowercase conversion
+		string fullString_l = fullString;
+		for (int i = 0; i < fullString_l.length(); i++) {
+			if ('A' <= fullString_l[i] && fullString_l[i] <= 'Z')
+				fullString_l[i] = fullString_l[i] - ('Z' - 'z');
+		}
 
-	// init encoding params
-	lame_global_flags *gfp = lame_init();
-	lame_set_brate(gfp, 192); // increase bitrate
-	lame_set_quality(gfp, 3); // increase quality level
-	lame_set_bWriteVbrTag(gfp, 0);
-	
-	// check params
-	ret = lame_init_params(gfp);
-	if (ret != 0) {
-		cerr << "Invalid encoding parameters! Quitting now." << endl;
-		return EXIT_FAILURE;
-	} else cout << "Parameters okay." << endl;
+		string subString_l = subString;
+		for (int i = 0; i < subString_l.length(); i++) {
+			if ('A' <= subString_l[i] && subString_l[i] <= 'Z')
+				subString_l[i] = subString_l[i] - ('Z' - 'z');
+		}
+		return (fullString_l.compare(fullString_l.length() - subString_l.length(), subString_l.length(),
+			subString_l) == 0);
+	}
+}
 
+list<string> parse_directory(const char *dirname)
+{
+	DIR *dir;
+	dirent *ent;
+	list<string> dirEntries;
 
-	// parse wave file
-	ret = read_wave("wail-long.wav", hdr, leftPcm, rightPcm);
-	if (ret != EXIT_SUCCESS) {
-		cerr << "Couldn't read wave input file." << endl;
-		return EXIT_FAILURE;
+	if ((dir = opendir(dirname)) != NULL) {
+		// list directory
+		while ((ent = readdir(dir)) != NULL) {
+			dirEntries.push_back(string(ent->d_name));
+		}
+		closedir(dir);
+	} else {
+		cerr << "Unable to parse directory." << endl;
 	}
 
-	// encode to mp3
-	/*ret = encode_to_file(gfp, hdr, leftPcm, rightPcm, "test.mp3");
-	if (ret != EXIT_SUCCESS) {
-		cerr << "Unable to encode to mp3." << endl;
-		return EXIT_FAILURE;
-	}*/
-
-	int written = 0;
-	lame_set_num_channels(gfp, hdr->numChannels);
-	lame_set_num_samples(gfp, hdr->dataSize / hdr->bytesPerSample);
-	ret = encode_chunks_to_file_multithreaded(gfp, hdr, leftPcm, rightPcm, written, "test.mp3", 2);
+	return dirEntries;
+}
 
 
-	//int numSamples = hdr->dataSize / hdr->bytesPerSample;
-	//lame_set_num_channels(gfp, hdr->numChannels);
-	//lame_set_num_samples(gfp, numSamples);
+typedef struct {
+	vector<string> *pFilenames;
+	bool *pbFilesFinished;
+	int iNumFiles;
+	int iThreadId;
+} ENC_WRK_ARGS;
 
-	//int bufferSize = numSamples * 5 / 4 + 7200; // worst case estimate
-	//unsigned char *outBuffer = new unsigned char[bufferSize];
+void *complete_encode_worker(void* arg)
+{
+	ENC_WRK_ARGS *args = (ENC_WRK_ARGS*)arg; // parse argument struct
 
-	//int bytesWritten = 0;
+	int iNumFilesProcessed = 0;
 
-	//// encode in chunks
-	//int totalBytes = 0;
-	//ret = encode_chunk_to_buffer(0, numSamples/2, gfp, leftPcm, rightPcm, outBuffer, bufferSize, bytesWritten);
-	//cout << bytesWritten << endl;
-	//totalBytes += bytesWritten;
+	while (true) {
+		cout << "Checking for work\n";
+		// determine which file to process next
+		bool bFoundWork = false;
+		int iFileIdx = -1;
+		for (int i = 0; i < args->iNumFiles; i++) {
+			if (!args->pbFilesFinished[i]) {
+				// LOCK HERE
+				args->pbFilesFinished[i] = true; // mark as being worked on
+				// UNLOCK
+				iFileIdx = i;
+				bFoundWork = true;
+				break;
+			}
+		}
 
-	//ret = encode_chunk_to_buffer(numSamples / 2 + 1, numSamples - 1, gfp, leftPcm, rightPcm,
-	//	&outBuffer[totalBytes], bufferSize, bytesWritten);
-	//cout << bytesWritten << endl;
-	//totalBytes += bytesWritten;
+		if (!bFoundWork) {// done yet?
+			ostringstream out;
+			out << "Thread " << args->iThreadId << " processed " << iNumFilesProcessed << " files." << endl;
+			printf(out.str().c_str());
+			return NULL; // break
+		}
+		string sMyFile = args->pFilenames->at(iFileIdx);
+		string sMyFileOut = sMyFile.substr(0, sMyFile.length() - 3) + "mp3";
 
-	//cout << "Total bytes: " << totalBytes << endl;
+		// start working
+		WAV_HDR *hdr = NULL;
+		short *leftPcm = NULL, *rightPcm = NULL;
+		// init encoding params
+		lame_global_flags *gfp = lame_init();
+		lame_set_brate(gfp, 192); // increase bitrate
+		lame_set_quality(gfp, 3); // increase quality level
+		lame_set_bWriteVbrTag(gfp, 0);
 
-	//// save to file
-	//FILE *out = fopen("test.mp3", "wb+");
-	//fwrite((void*)outBuffer, sizeof(unsigned char), totalBytes, out);
-	//
-	//// flush buffers
-	//int bytesFlushed = lame_encode_flush(gfp, outBuffer, bufferSize);
-	//cout << "Bytes flushed: " << bytesFlushed << endl;
-	//fwrite((void*)outBuffer, sizeof(unsigned char), bytesFlushed, out);
+		// check params
+		int ret = lame_init_params(gfp);
+		if (ret != 0) {
+			cerr << "Invalid encoding parameters! Quitting now." << endl;
+			exit(0);
+		}
 
-	//lame_mp3_tags_fid(gfp, out);
-	//fclose(out);
+		// parse wave file
+		printf("Parsing %s ...\n", sMyFile.c_str());
+		ret = read_wave(sMyFile.c_str(), hdr, leftPcm, rightPcm);
+		if (ret != EXIT_SUCCESS) {
+			printf("Error in file %s! Skipping.\n", sMyFile.c_str());
+			continue; // see if there's more to do
+		}
 
-	//delete[] outBuffer;
+		// encode to mp3
+		ret = encode_to_file(gfp, hdr, leftPcm, rightPcm, sMyFileOut.c_str());
+		if (ret != EXIT_SUCCESS) {
+			cerr << "Unable to encode mp3." << endl;
+			continue;
+		}
+
+		++iNumFilesProcessed;
+
+		lame_close(gfp);
+	}
+}
+
+int main(void)
+{
+	int ret;
+	const int NUM_THREADS = 2;
+	cout << "LAME version: " << get_lame_version() << endl;
+
+	// parse directory
+	list<string> files = parse_directory(".");
+	vector<string> wavFiles;
+	for (list<string>::iterator it = files.begin(); it != files.end(); it++) {
+		// check if it's a wave file
+		if (string_ends_with(*it, string(".wav"))) {
+			wavFiles.push_back(*it);
+		}
+	}
+
+	int numFiles = wavFiles.size();
+
+	cout << "Found " << numFiles << " .wav file(s) in directory." << endl;
+	if (!(numFiles>0)) return EXIT_SUCCESS;
+
+	// initialize pbFilesFinished array which contains true for all files which are currently already converted
+	bool *pbFilesFinished = new bool[numFiles];
+	for (int i = 0; i < numFiles; i++) pbFilesFinished[i] = false;
+
+
+	// initialize threads array and argument arrays
+	pthread_t *threads = new pthread_t[NUM_THREADS];
+	ENC_WRK_ARGS *threadArgs = (ENC_WRK_ARGS*)malloc(NUM_THREADS * sizeof(ENC_WRK_ARGS));
+	for (int i = 0; i < NUM_THREADS; i++) {
+		threadArgs[i].iNumFiles = numFiles;
+		threadArgs[i].pFilenames = &wavFiles;
+		threadArgs[i].pbFilesFinished = pbFilesFinished;
+		threadArgs[i].iThreadId = i;
+	}
+
+	// create threads
+	for (int i = 0; i < NUM_THREADS; i++) {
+		pthread_create(&threads[i], NULL, complete_encode_worker, (void*)&threadArgs[i]);
+	}
+
+	// join threads
+	for (int i = 0; i < NUM_THREADS; i++) {
+		int ret = pthread_join(threads[i], NULL);
+		if (ret != 0) {
+			cerr << "A POSIX thread error occured." << endl;
+		}
+	}
+
+
+	delete[] threads;
+	delete[] threadArgs;
 
 	cout << "Done." << endl;
-	
-	lame_close(gfp); // cleanup
 	return EXIT_SUCCESS;
 }
