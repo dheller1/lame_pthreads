@@ -63,13 +63,29 @@ list<string> parse_directory(const char *dirname)
 
 int main(int argc, char **argv)
 {
-	const int NUM_THREADS = 4;
+	int NUM_THREADS = 4;
 	if (argc < 2) {
-		cerr << "Usage: " << argv[0] << " PATH" << endl;
-		cerr << "   PATH will be searched for .WAV files which will be converted to .MP3 format." << endl;
+		cerr << "Usage: " << argv[0] << " PATH [-nN]" << endl;
+		cerr << "   PATH   required. Program looks here for .WAV files to convert to .MP3." << endl;
+		cerr << "   [-nN]  optional. If specified, N threads will be used." << endl;
 		return EXIT_FAILURE;
 	}
 	cout << "LAME version: " << get_lame_version() << endl;
+
+	// check for optional arguments
+	if (argc == 3) {
+		// check for '-n' option
+		if (0 == strncmp(argv[2], "-n", 2)) {
+			char *pcNumThreads = &argv[2][2]; // crop first two characters ('-n')
+			if (0 != atoi(pcNumThreads)) {
+				NUM_THREADS = atoi(pcNumThreads);
+				cout << "Using " << NUM_THREADS << " threads." << endl;
+			} else {
+				cout << "Warning: -n argument not valid. Defaulting to " << NUM_THREADS << " threads." << endl;
+			}
+			
+		}
+	}
 
 	// parse directory
 	list<string> files = parse_directory(argv[1]);
