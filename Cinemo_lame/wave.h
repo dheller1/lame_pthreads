@@ -9,6 +9,37 @@
 
 using namespace std;
 
+/* Initial header of WAV file */
+typedef struct {
+	char rID[4]; // "RIFF"
+	int fileLen; // length of file minus 8 for "RIFF" and fileLen.
+	char wID[4]; // "WAVE"
+} RIFF_HDR;
+
+/* Chunk header and data for 'fmt ' format chunk in WAV file (required).
+ * This information determines how the PCM input streams must be interpreted.
+ */
+typedef struct {
+	char ID[4]; // "fmt "
+	long chunkSize; // should be 16
+	short wFmtTag; // 0x01 for PCM - other modes unsupported
+	unsigned short wChannels; // number of channels (1 mono, 2 stereo)
+	unsigned long dwSamplesPerSec; // e.g. 44100
+	unsigned long dwBytesPerSec;   // e.g. 4*44100
+	unsigned short wBlockAlign; // bytes per sample (all channels, e.g. 4)
+	unsigned short wBitsPerSample; // bits per sample and channel, e.g. 16
+} FMT_DATA;
+
+/* Chunk header for any chunk type in IFF format
+ * such as 'fmt ' or 'data' (we ignore everything else).
+ */
+typedef struct {
+	char ID[4]; // any identifier
+	long chunkSize;
+} ANY_CHUNK_HDR;
+
+
+/* OBSOLETE - this was based on incorrect information on the WAV header format. */
 /* Struct for wave header (44 bytes) */
 typedef struct {
 	char rID[4]; // "RIFF"
@@ -24,28 +55,6 @@ typedef struct {
 	char dID[4]; // "data"
 	int dataSize; // size of data array
 } WAV_HDR;
-
-typedef struct {
-	char rID[4]; // "RIFF"
-	int fileLen; // length of file minus 8 for "RIFF" and fileLen.
-	char wID[4]; // "WAVE"
-} RIFF_HDR;
-
-typedef struct {
-	char ID[4]; // "fmt "
-	long chunkSize; // should be 16
-	short wFmtTag; // 0x01 for PCM - other modes unsupported
-	unsigned short wChannels; // number of channels (1 mono, 2 stereo)
-	unsigned long dwSamplesPerSec; // e.g. 44100
-	unsigned long dwBytesPerSec;   // e.g. 4*44100
-	unsigned short wBlockAlign; // bytes per sample (all channels, e.g. 4)
-	unsigned short wBitsPerSample; // bits per sample and channel, e.g. 16
-} FMT_DATA;
-
-typedef struct {
-	char ID[4]; // any identifier
-	long chunkSize;
-} ANY_CHUNK_HDR;
 
 
 /* read_wave
@@ -64,29 +73,26 @@ int read_wave(
 );
 
 /* read_wave_header
- *  Parses the given file stream for the 44-byte WAV header.
+ *  Parses the given file stream for the WAV header and 'fmt ' as well as 'data' information.
  *
  *  Return value:
- *    Pointer to newly allocated WAV_HDR struct (be sure to delete later).
+ *    EXIT_SUCCESS or EXIT_FAILURE
  */
-FMT_DATA* read_wave_header(
-	ifstream			&file				/* file stream to parse from (must be opened for reading) */
+int read_wave_header(
+	ifstream			&file,				/* file stream to parse from (must be opened for reading) */
+	FMT_DATA*			&hdr,				/* stores header info here (will be allocated) */
+	int					&iDataSize,			/* stores size of data array here */
+	int					&iDataOffset		/* stores data offset (first data byte in input file) here */
 );
 
-
-/* check_wave_header
- *  Simple validation of WAV header info provided by hdr.
- *  Will write diagnostic output if verbosity level is high enough.
- *
- *  Return value:
- *    EXIT_SUCCESS  if header is valid
- *    EXIT_FAILURE  if we probably can't handle that file
+/* check_riff_header
+ * Checks validity of initial WAV header ('RIFF', fileLen, 'WAVE')
  */
-int check_wave_header(
-	const WAV_HDR*		hdr					/* pointer to header struct which will be validated */
-);
-
 int check_riff_header(const RIFF_HDR *rHdr);
+
+/* check_format_data
+ * Checks validity of WAV settings provided by hdr.
+ */
 int check_format_data(const FMT_DATA *hdr);
 
 /* get_pcm_channels_from_wave
@@ -105,5 +111,21 @@ void get_pcm_channels_from_wave(
 	const int			iDataSize,			/* size of PCM data array */
 	const int			iDataOffset			/* first PCM array byte in file*/
 );
+
+
+
+/* OBSOLETE - this was based on incorrect information on the WAV header format.
+*  check_wave_header
+*  Simple validation of WAV header info provided by hdr.
+*  Will write diagnostic output if verbosity level is high enough.
+*
+*  Return value:
+*    EXIT_SUCCESS  if header is valid
+*    EXIT_FAILURE  if we probably can't handle that file
+*/
+int check_wave_header(
+	const WAV_HDR*		hdr					/* pointer to header struct which will be validated */
+);
+
 
 #endif //__WAVE_H_
