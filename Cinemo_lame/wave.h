@@ -12,7 +12,7 @@ using namespace std;
 /* Initial header of WAV file */
 typedef struct {
 	char rID[4]; // "RIFF"
-	int fileLen; // length of file minus 8 for "RIFF" and fileLen.
+	unsigned int fileLen; // length of file minus 8 for "RIFF" and fileLen.
 	char wID[4]; // "WAVE"
 } RIFF_HDR;
 
@@ -21,11 +21,11 @@ typedef struct {
  */
 typedef struct {
 	char ID[4]; // "fmt "
-	long chunkSize; // should be 16
-	short wFmtTag; // 0x01 for PCM - other modes unsupported
+	unsigned int chunkSize; // should be 16
+	unsigned short wFmtTag; // 0x01 for PCM - other modes unsupported
 	unsigned short wChannels; // number of channels (1 mono, 2 stereo)
-	unsigned long dwSamplesPerSec; // e.g. 44100
-	unsigned long dwBytesPerSec;   // e.g. 4*44100
+	unsigned int dwSamplesPerSec; // e.g. 44100
+	unsigned int dwBytesPerSec;   // e.g. 4*44100
 	unsigned short wBlockAlign; // bytes per sample (all channels, e.g. 4)
 	unsigned short wBitsPerSample; // bits per sample and channel, e.g. 16
 } FMT_DATA;
@@ -35,7 +35,7 @@ typedef struct {
  */
 typedef struct {
 	char ID[4]; // any identifier
-	long chunkSize;
+	unsigned int chunkSize;
 } ANY_CHUNK_HDR;
 
 

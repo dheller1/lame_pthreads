@@ -65,7 +65,7 @@ int read_wave_header(ifstream &file, FMT_DATA *&hdr, int &iDataSize, int &iDataO
 int check_format_data(const FMT_DATA *hdr)
 {
 	if (hdr->wFmtTag != 0x01) {
-		cerr << "Bad non-PCM format." << endl;
+		cerr << "Bad non-PCM format:" << hdr->wFmtTag << endl;
 		return EXIT_FAILURE;
 	}
 	if (hdr->wChannels != 1 && hdr->wChannels != 2) {
