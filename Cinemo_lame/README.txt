@@ -15,8 +15,9 @@
                libmpghip-static.lib)
               
   - Windows only:
-    pthreads-win32 version 2.9.1 (pthreadVC2.lib)
+    pthreads-win32 version 2.9.1 (pthreadVC2.lib or pthreadVC2.dll)
       https://www.sourceware.org/pthreads-win32/
+    I've used the prebuilt DLL.
      
   - Windows only (standard header for Linux):
     dirent.h
@@ -34,6 +35,7 @@
      is all you need. If anything goes wrong, ensure that the include path
      for	"lame.h" is correct and the libraries libpthread andlibmp3lame
      can be found.
+     Feel free to change warning and optimization levels etc.
      Tested with: g++ 4.8.4
     
   - Windows:
@@ -46,6 +48,10 @@
      compilers though.
      For a custom build, make sure that the preprocessor directive WIN32 has
      been set (should be default for Visual Studio at least).
+     I've built the LAME static libs from source which was flawlessly working
+     with VS2013.
+     
+   Note: It is presumed that sizeof(short) == 2, sizeof(int) == 4!
 
      
 	USAGE
@@ -60,6 +66,9 @@
    Non WAV-files will be ignored and invalid files ending in .wav should be
    skipped. Encoding time for all files is measured for an easy performance
    comparison with different numbers of threads.
+   
+   For a quick first impressions, I made some screenshots for Windows and
+   Linux calls of the program.
    
    
   IMPLEMENTATION NOTES
@@ -136,7 +145,7 @@
 	 (2) Memory allocation errors are not handled. There might even be
 	 some memory leaks, I didn't use profiling to find them yet.
 	 While I've tested processing hundreds of input files, I didn't test
-	 with very large amounts data (>300MB), so if you want to encode your
+	 with very large amounts data (>100MB), so if you want to encode your
 	 whole audio CD collection I don't know if it works.
 	 
 	 (3) The parallel access to the 'pbFilesProcessed' array, which determines
