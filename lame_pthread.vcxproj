@@ -10,9 +10,19 @@
       <Platform>Win32</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="source\lame_interface.cpp" />
+    <ClCompile Include="source\main.cpp" />
+    <ClCompile Include="source\wave.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="source\lame_interface.h" />
+    <ClInclude Include="source\wave.h" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{C2CC7616-9AC2-43F2-A062-05B5280C6AF0}</ProjectGuid>
     <RootNamespace>Cinemo_lame</RootNamespace>
+    <ProjectName>lame_pthread</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -44,13 +54,13 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>C:\lib\lame-3.99.5\include;C:\lib\pthreads-w32-2-9-1\Pre-built.2\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\lib\lame-3.99.5\include;C:\lib\pthreads-w32-2-9-1\Pre-built.2\include;$(ProjectDir)\source\win</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>C:\lib\lame-3.99.5\output\Debug;C:\lib\pthreads-w32-2-9-1\Pre-built.2\lib\x86</AdditionalLibraryDirectories>
-      <AdditionalDependencies>libmp3lame-static.lib;libmpghip-static.lib;pthreadVC2.lib;pthreadVCE2.lib;pthreadVSE2.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libmp3lame-static.lib;libmpghip-static.lib;pthreadVC2.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>LIBCMTD</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
@@ -61,26 +71,17 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>C:\lib\lame-3.99.5\include\;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\lib\lame-3.99.5\include\;C:\lib\pthreads-w32-2-9-1\Pre-built.2\include;$(ProjectDir)\source\win</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>C:\lib\lame-3.99.5\output\Release</AdditionalLibraryDirectories>
-      <AdditionalDependencies>libmp3lame-static.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\lib\lame-3.99.5\output\Release;C:\lib\pthreads-w32-2-9-1\Pre-built.2\lib\x86</AdditionalLibraryDirectories>
+      <AdditionalDependencies>libmp3lame-static.lib;libmpghip-static.lib;pthreadVC2.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClCompile Include="lame_interface.cpp" />
-    <ClCompile Include="main.cpp" />
-    <ClCompile Include="pthreads_test.cpp" />
-    <ClCompile Include="wave.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="lame_interface.h" />
-    <ClInclude Include="wave.h" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
