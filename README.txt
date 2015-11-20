@@ -24,16 +24,16 @@
       https://github.com/tronkko/dirent
        
 
-	BUILD
+  BUILD
 ==================================
 
   - Linux:
-  	 I provided a (minimal) Makefile, so 
+     I provided a (minimal) Makefile, so 
   	
   	   make
     
      is all you need. If anything goes wrong, ensure that the include path
-     for	"lame.h" is correct and the libraries libpthread andlibmp3lame
+     for "lame.h" is correct and the libraries libpthread and libmp3lame
      can be found.
      Feel free to change warning and optimization levels etc.
      Tested with: g++ 4.8.4
@@ -54,7 +54,7 @@
    Note: It is presumed that sizeof(short) == 2, sizeof(int) == 4!
 
      
-	USAGE
+  USAGE
 ==================================
 
      ./lame_pthreads PATH [-nN]
@@ -127,46 +127,47 @@
    LIMITATIONS & ISSUES
 ==================================
 
-	 I tried my best to come up with a clean, readable, and effective
-	 working solution, but please understand that I currently cannot further
-	 polish the code due to time limitations - I have to prepare for my
-	 PhD defense taking place in only a week from today.
-	 
-	 I'll try to provide a list of issues that I'd continue to work on
-	 given the chance in order to improve stability:
+    I tried my best to come up with a clean, readable, and effective
+    working solution, but please understand that I currently cannot further
+    polish the code due to time limitations.
+ 
+    I'll try to provide a list of issues that I'd continue to work on
+    given the chance in order to improve stability:
 
-	 (1) While there is some error handling present to deal with invalid
-	 input files, this is by no means done perfectly. Output might become
-	 quite confusing if many invalid input files are present due to the
-	 parallel nature of the program.
-	 I've mixed cout/cerr/printf frequently as the stream-based output
-	 can become unreadable when other threads interfere.
+    (1) While there is some error handling present to deal with invalid
+    input files, this is by no means done perfectly. Output might become
+    quite confusing if many invalid input files are present due to the
+    parallel nature of the program.
+    I've mixed cout/cerr/printf frequently as the stream-based output
+    can become unreadable when other threads interfere.
 	 
-	 (2) Memory allocation errors are not handled. There might even be
-	 some memory leaks, I didn't use profiling to find them yet.
-	 While I've tested processing hundreds of input files, I didn't test
-	 with very large amounts data (>100MB), so if you want to encode your
-	 whole audio CD collection I don't know if it works.
+    (2) Memory allocation errors are not handled. There might even be
+    some memory leaks, I didn't use profiling to find them yet.
+    While I've tested processing hundreds of input files, I didn't test
+    with very large amounts data (>100MB), so if you want to encode your
+    whole audio CD collection I don't know if it works.
 	 
-	 (3) The parallel access to the 'pbFilesProcessed' array, which determines
-	 which files are yet to be processed, is not protected by mutexes/locks.
-	 While there's only atomic writing access, I'm not sure if this OpenMP
-	 concept also applies to pthreads.
-	 What will seldomly happen is that an input file is processed by several
-	 threads at the same time, leading to output like '269 of 268 files processed'.
-	 Unfortunately I didn't have the time to familiarize myself with pthreads
-	 mutexes/locks to fix this.
+    (3) The parallel access to the 'pbFilesProcessed' array, which determines
+    which files are yet to be processed, is not protected by mutexes/locks.
+    While there's only atomic writing access, I'm not sure if this OpenMP
+    concept also applies to pthreads.
+    What will seldomly happen is that an input file is processed by several
+    threads at the same time, leading to output like '269 of 268 files processed'.
+    Unfortunately I didn't have the time to familiarize myself with pthreads
+    mutexes/locks to fix this.
 	 
-	 (4) WAV files can be quite complex and include all kinds of contents,
-	 compression, etc. The program tries to exclude any incompatible files and
-	 it worked for the test files I was able to find, but I'm sure weird things
-	 can and will happen when trying to encode unusual WAV files.
-	 Some assumptions made in the program are:
-	  - first bytes of the file must be
-	    'RIFF'   char[4]
-	    fileLen  int
-	    'WAVE'   char[4]
-	  - data must be in PCM format (wFmtTag == 0x01)
-	  - number of channels must be 1 (Mono) or 2 (Stereo)
-	  - IFF chunks must be valid, we skip everything that's not 'fmt ' or 'data'
-	  - wBlockAlign == wBitsPerSample * wChannels / 8
+    (4) WAV files can be quite complex and include all kinds of contents,
+    compression, etc. The program tries to exclude any incompatible files and
+    it worked for the test files I was able to find, but I'm sure weird things
+    can and will happen when trying to encode unusual WAV files.
+    Some assumptions made in the program are:
+      - first bytes of the file must be
+        'RIFF'   char[4]
+        fileLen  int
+        'WAVE'   char[4]
+      - data must be in PCM format (wFmtTag == 0x01)
+      - number of channels must be 1 (Mono) or 2 (Stereo)
+      - IFF chunks must be valid, we skip everything that's not 'fmt ' or 'data'
+      - wBlockAlign == wBitsPerSample * wChannels / 8
+
+    (5) I've mixed hungarian notation and arbitrary naming inconsistently.
