@@ -39,24 +39,6 @@ typedef struct {
 } ANY_CHUNK_HDR;
 
 
-/* OBSOLETE - this was based on incorrect information on the WAV header format. */
-/* Struct for wave header (44 bytes) */
-typedef struct {
-	char rID[4]; // "RIFF"
-	int fileLen; // length of file minus 8.
-	char wID[8]; // "WAVEfmt "
-	int pcmHeaderLength; // 16
-	short fmtTag;
-	short numChannels; // 1: Mono, 2: Stereo
-	int sampleRate; // samples per sec
-	int byteRate; // Bytes per sec
-	short bytesPerSample;
-	short bitsPerSample; // actually per sample and channel (i.e. could be 16 bits / 4 bytes per sample for stereo)
-	char dID[4]; // "data"
-	int dataSize; // size of data array
-} WAV_HDR;
-
-
 /* read_wave
  *  Read a WAV file given by filename, parsing the 44 byte header into hdr (will be allocated),
  *  allocating arrays for left and right (only left for mono input) PCM channels and returning
@@ -111,21 +93,5 @@ void get_pcm_channels_from_wave(
 	const int			iDataSize,			/* size of PCM data array */
 	const int			iDataOffset			/* first PCM array byte in file*/
 );
-
-
-
-/* OBSOLETE - this was based on incorrect information on the WAV header format.
-*  check_wave_header
-*  Simple validation of WAV header info provided by hdr.
-*  Will write diagnostic output if verbosity level is high enough.
-*
-*  Return value:
-*    EXIT_SUCCESS  if header is valid
-*    EXIT_FAILURE  if we probably can't handle that file
-*/
-int check_wave_header(
-	const WAV_HDR*		hdr					/* pointer to header struct which will be validated */
-);
-
 
 #endif //__WAVE_H_

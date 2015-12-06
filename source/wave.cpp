@@ -91,39 +91,6 @@ int check_riff_header(const RIFF_HDR *rHdr)
 	return EXIT_FAILURE;
 }
 
-int OBSOLETE_check_wave_header(const WAV_HDR *hdr)
-{
-	// check ID strings
-	if (0 != strncmp(hdr->rID, "RIFF", 4) || 0 != strncmp(hdr->wID, "WAVEfmt ", 8) || 0 != strncmp(hdr->dID, "data", 4)) {
-		string rID = string(hdr->rID, 4);
-		string wID = string(hdr->wID, 8);
-		string dID = string(hdr->dID, 4);
-		cerr << "Bad header: rID/wID/dID = '" << rID.c_str() << "', '" << wID.c_str() << "', '" << dID.c_str() << "'" << endl;
-		return EXIT_FAILURE;
-	}
-	else if (hdr->fmtTag != 0x01) {// no PCM?
-		cerr << "Bad header: No non-PCM format allowed!" << endl;
-		return EXIT_FAILURE;
-	}
-
-
-#ifdef __VERBOSE_
-	cout << "Length of file-8:  " << hdr->fileLen << endl; // file length
-	cout << "PCM header length: " << hdr->pcmHeaderLength << endl;
-	cout << "Format version:    " << hdr->fmtVersion << endl;
-	cout << "Channels:          " << hdr->numChannels << endl;
-	cout << "Sample rate:       " << hdr->sampleRate << " Hz" << endl;
-	cout << "Byte rate:         " << hdr->byteRate << " B/s" << endl;
-	cout << "Bytes per sample:  " << hdr->bytesPerSample << endl;
-	cout << "Bits per sample:   " << hdr->bitsPerSample << endl;
-	cout << "Length of data:    " << hdr->dataSize << endl;
-
-	cout << "WAV file seems okay." << endl;
-	cout << "Number of samples (per channel): " << hdr->dataSize / hdr->bytesPerSample << endl;
-#endif
-	return EXIT_SUCCESS;
-}
-
 void get_pcm_channels_from_wave(ifstream &file, const FMT_DATA* hdr, short* &leftPcm, short* &rightPcm, const int iDataSize,
 	const int iDataOffset)
 {

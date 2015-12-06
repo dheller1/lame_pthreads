@@ -1,5 +1,7 @@
 #include "lame_interface.h"
 
+static pthread_mutex_t mutFilesFinished = PTHREAD_MUTEX_INITIALIZER;
+
 int encode_to_file(lame_global_flags *gfp, const FMT_DATA *hdr, const short *leftPcm, const short *rightPcm,
 	const int iDataSize, const char *filename)
 {
@@ -38,192 +40,6 @@ int encode_to_file(lame_global_flags *gfp, const FMT_DATA *hdr, const short *lef
 	return EXIT_SUCCESS;
 }
 
-// Ensure that all settings in GFP have been set correctly before calling this routine!
-int encode_chunk_to_buffer(int firstSample, int lastSample, lame_global_flags *gfp, const short *leftPcm,
-	const short *rightPcm, unsigned char* outBuffer, const int outBufferSize, int &bytesWritten)
-{
-	if (lastSample - firstSample < 0) return EXIT_FAILURE;
-
-	int numSamples = lastSample - firstSample;
-
-	bytesWritten = lame_encode_buffer(gfp, &leftPcm[firstSample], &rightPcm[firstSample], numSamples, outBuffer,
-		outBufferSize);
-	return EXIT_SUCCESS;
-}
-
-void *encode_chunk_to_buffer_worker(void* arg)
-{
-	CHNK_TO_BFR_ARGS *args = (CHNK_TO_BFR_ARGS*)arg;
-	int numSamples = args->lastSample - args->firstSample;
-
-#ifdef __VERBOSE_
-	printf("+--------------------------------+\n"
-		"| Thread Samples %d-%d (%d)          \n"
-		"| GFP addr. 0x%x                   \n"
-		"| PCM_L addr. 0x%x                 \n"
-		"| PCM_R addr. 0x%x                 \n"
-		"| outBuffer addr. 0x%x             \n"
-		"| outBufferSize %d               \n",
-		"+--------------------------------+\n",
-		args->firstSample, args->lastSample, numSamples, args->gfp, args->leftPcm, args->rightPcm,
-		args->outBuffer, args->outBufferSize);
-#endif
-
-	int ret = lame_encode_buffer(args->gfp, &(args->leftPcm[args->firstSample]), &(args->rightPcm[args->firstSample]),
-		numSamples, args->outBuffer, args->outBufferSize);
-
-	*(args->bytesWritten) = ret;
-	return NULL;
-}
-
-int encode_chunks_to_file(lame_global_flags *gfp, const WAV_HDR *hdr, const short *leftPcm, const short *rightPcm,
-	int &bytesWritten, const char *filename, unsigned short numChunks)
-{
-	int numSamples = hdr->dataSize / hdr->bytesPerSample;
-	int samplesPerChunk = numSamples / numChunks + 1;
-	int chunkSize = samplesPerChunk * 5 / 4 + 7200; // worst case estimate in bytes
-
-	bytesWritten = 0;
-
-	// allocate output buffers
-	unsigned char **outBuffers = new unsigned char*[numSamples];
-	int *writtenInChunk = new int[numSamples];
-	for (int i = 0; i < numChunks; i++) {
-		outBuffers[i] = new unsigned char[chunkSize];
-	}
-
-	// encode chunks
-	for (int i = 0; i < numChunks; i++) {
-		int firstSample = i * samplesPerChunk;
-		int lastSample = firstSample + samplesPerChunk - 1;
-		if (lastSample >= numSamples) lastSample = numSamples - 1;
-
-		encode_chunk_to_buffer(firstSample, lastSample, gfp, leftPcm, rightPcm, outBuffers[i],
-			chunkSize, writtenInChunk[i]);
-#ifdef __VERBOSE_
-		cout << "Chunk " << i << " (samples " << firstSample << "-" << lastSample << "): Wrote "
-			<< writtenInChunk[i] << " bytes." << endl;
-#endif
-	}
-
-	// write chunk buffers to file
-	FILE *out = fopen(filename, "wb+");
-	for (int i = 0; i < numChunks; i++) {
-		fwrite((void*)outBuffers[i], sizeof(unsigned char), writtenInChunk[i], out);
-		bytesWritten += writtenInChunk[i];
-	}
-
-	// clear temporary buffers
-	for (int i = 0; i < numChunks; i++) {
-		delete[] outBuffers[i];
-	}
-	delete[] outBuffers;
-	delete[] writtenInChunk;
-
-	// flush buffers
-	unsigned char *flushBuffer = new unsigned char[32768]; // just provide enough buffer size, lower might be fine
-	int flushSize = lame_encode_flush(gfp, flushBuffer, 32768);
-
-	fwrite((void*)flushBuffer, sizeof(unsigned char), flushSize, out);
-	bytesWritten += flushSize;
-	delete[] flushBuffer;
-
-	lame_mp3_tags_fid(gfp, out);
-
-	fclose(out);
-#ifdef __VERBOSE_
-	cout << "Wrote " << bytesWritten << " bytes in total." << endl;
-#endif
-	return EXIT_SUCCESS;
-}
-
-int encode_chunks_to_file_multithreaded(lame_global_flags *gfp, const WAV_HDR *hdr, const short *leftPcm,
-	const short *rightPcm, int &bytesWritten, const char *filename, unsigned short numThreads)
-{
-	int numChunks = numThreads;
-	int numSamples = hdr->dataSize / hdr->bytesPerSample;
-	int samplesPerChunk = numSamples / numChunks + 1;
-	int chunkSize = samplesPerChunk * 5 / 4 + 7200; // worst case estimate in bytes
-
-	bytesWritten = 0;
-
-	// allocate threads array and argument structs
-	pthread_t *threads = new pthread_t[numThreads];
-	CHNK_TO_BFR_ARGS *threadArgs = (CHNK_TO_BFR_ARGS*)malloc(numThreads * sizeof(CHNK_TO_BFR_ARGS));
-
-	// allocate output buffers
-	unsigned char **outBuffers = new unsigned char*[numSamples];
-	int *writtenInChunk = new int[numSamples];
-	for (int i = 0; i < numChunks; i++) {
-		outBuffers[i] = new unsigned char[chunkSize];
-	}
-
-	// assemble thread argument structs
-	for (int i = 0; i < numChunks; i++) {
-		int firstSample = i * samplesPerChunk;
-		int lastSample = firstSample + samplesPerChunk - 1;
-		if (lastSample >= numSamples) lastSample = numSamples - 1;
-
-		// assemble argument struct
-		threadArgs[i].firstSample = firstSample;
-		threadArgs[i].lastSample = lastSample;
-		threadArgs[i].gfp = gfp;
-		threadArgs[i].leftPcm = leftPcm;
-		threadArgs[i].rightPcm = rightPcm;
-		threadArgs[i].outBuffer = outBuffers[i];
-		threadArgs[i].outBufferSize = chunkSize;
-		threadArgs[i].bytesWritten = &writtenInChunk[i];
-	}
-
-	// spawn threads
-	for (int i = 0; i < numChunks; i++) {
-		pthread_create(&threads[i], NULL, encode_chunk_to_buffer_worker, (void*)&threadArgs[i]);
-	}
-
-	// let them do work and synchronize
-	for (int i = 0; i < numChunks; i++) {
-		int ret = pthread_join(threads[i], NULL);
-		if (ret != 0) {
-			cerr << "A POSIX thread error occured. Quitting." << endl;
-			exit(ret);
-		}
-	}
-
-	// write chunk buffers to file
-	FILE *out = fopen(filename, "wb+");
-	for (int i = 0; i < numChunks; i++) {
-		fwrite((void*)outBuffers[i], sizeof(unsigned char), writtenInChunk[i], out);
-		bytesWritten += writtenInChunk[i];
-	}
-
-
-	// clear temporary buffers
-	for (int i = 0; i < numChunks; i++) {
-		delete[] outBuffers[i];
-	}
-	delete[] outBuffers;
-	delete[] writtenInChunk;
-
-	// flush buffers
-	unsigned char *flushBuffer = new unsigned char[32768]; // just provide enough buffer size, lower might be fine
-	int flushSize = lame_encode_flush(gfp, flushBuffer, 32768);
-
-	fwrite((void*)flushBuffer, sizeof(unsigned char), flushSize, out);
-	bytesWritten += flushSize;
-	delete[] flushBuffer;
-
-	lame_mp3_tags_fid(gfp, out);
-
-	fclose(out);
-	delete[] threads;
-	free(threadArgs);
-
-#ifdef __VERBOSE_
-	cout << "Wrote " << bytesWritten << " bytes in total." << endl;
-#endif
-	return EXIT_SUCCESS;
-}
-
 void *complete_encode_worker(void* arg)
 {
 	int ret;
@@ -236,6 +52,8 @@ void *complete_encode_worker(void* arg)
 		// determine which file to process next
 		bool bFoundWork = false;
 		int iFileIdx = -1;
+
+		//pthread_mutex_lock(&mutFilesFinished);
 		for (int i = 0; i < args->iNumFiles; i++) {
 			if (!args->pbFilesFinished[i]) {
 				
@@ -249,6 +67,7 @@ void *complete_encode_worker(void* arg)
 				break;
 			}
 		}
+		//pthread_mutex_unlock(&mutFilesFinished);
 
 		if (!bFoundWork) {// done yet?
 			return NULL; // break
