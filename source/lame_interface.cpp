@@ -53,7 +53,7 @@ void *complete_encode_worker(void* arg)
 		bool bFoundWork = false;
 		int iFileIdx = -1;
 
-		//pthread_mutex_lock(&mutFilesFinished);
+		pthread_mutex_lock(&mutFilesFinished);
 		for (int i = 0; i < args->iNumFiles; i++) {
 			if (!args->pbFilesFinished[i]) {
 				
@@ -67,7 +67,7 @@ void *complete_encode_worker(void* arg)
 				break;
 			}
 		}
-		//pthread_mutex_unlock(&mutFilesFinished);
+		pthread_mutex_unlock(&mutFilesFinished);
 
 		if (!bFoundWork) {// done yet?
 			return NULL; // break

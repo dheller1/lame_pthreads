@@ -150,5 +150,7 @@ int main(int argc, char **argv)
 	delete[] threadArgs;
 
 	cout << "Done." << endl;
+	if (iProcessedTotal > numFiles)
+		return EXIT_FAILURE;
 	return EXIT_SUCCESS;
 }
