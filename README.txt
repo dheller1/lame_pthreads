@@ -149,14 +149,9 @@
 	 
     (3) The parallel access to the 'pbFilesProcessed' array, which determines
     which files are yet to be processed, is not protected by mutexes/locks.
-    While there's only atomic writing access, I'm not sure if this OpenMP
-    concept also applies to pthreads.
-    What will seldomly happen is that an input file is processed by several
-    threads at the same time, leading to output like '269 of 268 files processed'.
-    Unfortunately I didn't have the time to familiarize myself with pthreads
-    mutexes/locks to fix this.
+    ---- This has been fixed as of commit 7c86063 ----
 	 
-    (4) WAV files can be quite complex and include all kinds of contents,
+    (4) WAV files can be quite complex and include all kinds of content,
     compression, etc. The program tries to exclude any incompatible files and
     it worked for the test files I was able to find, but I'm sure weird things
     can and will happen when trying to encode unusual WAV files.
