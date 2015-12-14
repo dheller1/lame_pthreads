@@ -117,7 +117,7 @@ void *complete_encode_worker(void* arg)
 		lame_close(gfp);
 		if (leftPcm != NULL) delete[] leftPcm;
 		if (rightPcm != NULL) delete[] rightPcm;
-		if (hdr != NULL) delete[] hdr;
+		if (hdr != NULL) delete hdr;
 	}
 
 	pthread_exit((void*)0);
