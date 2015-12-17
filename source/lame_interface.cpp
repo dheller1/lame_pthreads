@@ -56,12 +56,7 @@ void *complete_encode_worker(void* arg)
 		pthread_mutex_lock(&mutFilesFinished);
 		for (int i = 0; i < args->iNumFiles; i++) {
 			if (!args->pbFilesFinished[i]) {
-				
-				// NORMALLY: LOCK HERE
 				args->pbFilesFinished[i] = true; // mark as being worked on
-				// UNLOCK
-				// but this is an atomic operation, so there shouldn't be any conflicts!
-				
 				iFileIdx = i;
 				bFoundWork = true;
 				break;
