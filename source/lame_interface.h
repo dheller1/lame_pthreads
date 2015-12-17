@@ -46,8 +46,6 @@ int encode_to_file(lame_global_flags *gfp, const FMT_DATA *hdr, const short *lef
  *  are already worked upon, and some additional info via a ENC_WRK_ARGS struct.
  *  As long as there are still unprocessed filenames, this routine will fetch the next free filename, mark it as
  *  processed, and execute the complete conversion from reading .wav to writing .mp3.
- *  No mutexes or locks are required as there is only atomic operation access to the status array, while all
- *  other parameters are read-only in all threads or private to each thread.
  */
 void *complete_encode_worker(void* arg);
 
